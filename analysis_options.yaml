@@ -1,0 +1,15 @@
+# Static analysis configuration.
+#
+# The project rules live in CLAUDE.md. This file enforces the ones an analyzer can
+# check, so they are caught at build time instead of at review time.
+
+include: package:flutter_lints/flutter.yaml
+
+linter:
+  rules:
+    # CLAUDE.md §4 — "Always declare the type explicitly." This covers locals, fields,
+    # parameters, return types and generic type arguments.
+    #
+    # `omit_local_variable_types` is the exact opposite of this rule and must never be
+    # enabled alongside it. `flutter_lints` does not enable it; do not add it.
+    always_specify_types: true
