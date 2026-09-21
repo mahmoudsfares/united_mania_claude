@@ -8,6 +8,7 @@ import '../../core/shared_widgets/app_network_image.dart';
 import '../../core/utils/app_error_messages.dart';
 import '../../core/utils/app_strings.dart';
 import '../../core/utils/date_formatter.dart';
+import '../../core/utils/routes.dart';
 import 'business_logic/news_feed_cubit.dart';
 import 'business_logic/news_feed_state.dart';
 import 'models/article.dart';
@@ -144,7 +145,11 @@ class _ArticleCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 12.0, vertical: 6.0),
       child: InkWell(
-        onTap: () {},
+        onTap: () => Navigator.pushNamed(
+          context,
+          Routes.newsDetails,
+          arguments: article,
+        ),
         child: Padding(
           padding: const EdgeInsets.all(12.0),
           child: Row(

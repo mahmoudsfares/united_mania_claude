@@ -4,11 +4,27 @@ import 'package:united_mania_claude/core/di/app_di.dart';
 import 'package:united_mania_claude/core/routing/app_router.dart';
 import 'package:united_mania_claude/core/utils/app_strings.dart';
 import 'package:united_mania_claude/core/utils/routes.dart';
+import 'package:united_mania_claude/features/news_details/news_details_screen.dart';
+import 'package:united_mania_claude/features/news_feed/models/article.dart';
 import 'package:united_mania_claude/features/news_feed/news_feed_screen.dart';
+
+const Article _article = Article(
+  source: null,
+  author: null,
+  title: 'A United win',
+  description: null,
+  url: null,
+  urlToImage: null,
+  publishedAt: null,
+  content: null,
+);
 
 void main() {
   group('AppRouter.generateRoute', () {
-    tearDown(() => AppDi.disposeNewsFeed());
+    tearDown(() {
+      AppDi.disposeNewsFeed();
+      AppDi.disposeNewsDetails();
+    });
 
     testWidgets('Routes.home builds a NewsFeedScreen', (
       WidgetTester tester,
@@ -26,6 +42,70 @@ void main() {
 
       expect(route.builder(context), isA<NewsFeedScreen>());
     });
+
+    testWidgets(
+      'Routes.newsDetails with an Article argument builds a NewsDetailsScreen '
+      'for that article',
+      (WidgetTester tester) async {
+        await tester.pumpWidget(const SizedBox());
+        final BuildContext context = tester.element(find.byType(SizedBox));
+
+        final MaterialPageRoute<void> route =
+            AppRouter.generateRoute(
+                  const RouteSettings(
+                    name: Routes.newsDetails,
+                    arguments: _article,
+                  ),
+                )
+                as MaterialPageRoute<void>;
+
+        final Widget screen = route.builder(context);
+
+        expect(screen, isA<NewsDetailsScreen>());
+        expect((screen as NewsDetailsScreen).article, same(_article));
+      },
+    );
+
+    testWidgets(
+      'Routes.newsDetails with a missing argument shows the '
+      'route-not-found screen',
+      (WidgetTester tester) async {
+        await tester.pumpWidget(const SizedBox());
+        final BuildContext context = tester.element(find.byType(SizedBox));
+
+        final MaterialPageRoute<void> route =
+            AppRouter.generateRoute(
+                  const RouteSettings(name: Routes.newsDetails),
+                )
+                as MaterialPageRoute<void>;
+
+        await tester.pumpWidget(MaterialApp(home: route.builder(context)));
+
+        expect(find.text(AppStrings.routeNotFound), findsOneWidget);
+      },
+    );
+
+    testWidgets(
+      'Routes.newsDetails with a wrong-typed argument shows the '
+      'route-not-found screen',
+      (WidgetTester tester) async {
+        await tester.pumpWidget(const SizedBox());
+        final BuildContext context = tester.element(find.byType(SizedBox));
+
+        final MaterialPageRoute<void> route =
+            AppRouter.generateRoute(
+                  const RouteSettings(
+                    name: Routes.newsDetails,
+                    arguments: 'not an article',
+                  ),
+                )
+                as MaterialPageRoute<void>;
+
+        await tester.pumpWidget(MaterialApp(home: route.builder(context)));
+
+        expect(find.text(AppStrings.routeNotFound), findsOneWidget);
+      },
+    );
 
     testWidgets('an unknown route shows the route-not-found screen', (
       WidgetTester tester,
