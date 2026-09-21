@@ -9,6 +9,8 @@ void main() {
       expect(AppStrings.retry, isNotEmpty);
       expect(AppStrings.readFullArticle, isNotEmpty);
       expect(AppStrings.noArticles, isNotEmpty);
+      expect(AppStrings.routeNotFound, isNotEmpty);
+      expect(AppStrings.sourceDateSeparator, isNotEmpty);
     });
   });
 }

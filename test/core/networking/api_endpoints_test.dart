@@ -21,6 +21,17 @@ void main() {
       expect(ApiEndpoints.apiKeyQueryParam, 'apiKey');
     });
 
+    test('feed query parameter names are correct', () {
+      expect(ApiEndpoints.qQueryParam, 'q');
+      expect(ApiEndpoints.sortByQueryParam, 'sortBy');
+      expect(ApiEndpoints.languageQueryParam, 'language');
+    });
+
+    test('pagination query parameter names are correct', () {
+      expect(ApiEndpoints.pageQueryParam, 'page');
+      expect(ApiEndpoints.pageSizeQueryParam, 'pageSize');
+    });
+
     test('api key is set', () {
       expect(ApiEndpoints.apiKey, isNotEmpty);
     });

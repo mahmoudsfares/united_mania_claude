@@ -11,8 +11,8 @@ It covers:
 3. Architecture rules (cubit-only, concrete repos, `StateResource`, disposal, builder scoping)
 4. Coding rules (explicit types, DRY, no over-engineering, no hardcoded values)
 5. Theme (red + accents, white fonts)
-6. Mock repos
-7. Testing — TDD
+6. Mock repos — written before the real repo, and owning the feature's only fake payload
+7. Testing — TDD, test data from the mock repo, and the repo scenario checklist
 8. Definition of done
 9. `configurations/` — documentation and reports
 10. Working rhythm — one subtask at a time, tests first, report after

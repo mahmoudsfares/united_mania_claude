@@ -131,9 +131,18 @@ Screen + `models/` + `business_logic/` (cubit, state, repo). One feature = one d
 
 Every real repo has a mock twin that mimics the server response with fake data.
 
+- **Write the mock repo first.** It comes before the real repo and before the real repo's tests,
+  because it is what fixes the shape of the payload everything else is built against.
 - Same public API as the real repo, returning the same `StateResource` shapes.
 - Lives next to the real repo in the feature's `business_logic/` directory
   (`<feature>_mock_repo.dart`).
+- **It owns the fake payload and exposes it.** The fake server response bodies are
+  `static const Map<String, dynamic>` fields on the mock repo — one for the success body, one for
+  the error body. The mock repo builds its own `StateResource` by parsing those same fields through
+  the real models, so the data it serves at runtime and the data the tests assert against are the
+  same values. There is one fake payload per feature and it lives here.
+- Keys inside a fixture come from `core/utils/json_keys.dart`. The *values* are invented literals —
+  that is what a fixture is — and the mock repo is the only place such literals are allowed.
 - Includes a small artificial delay, and covers both success and failure paths so manual testing
   can exercise the error UI.
 - Swapping real ↔ mock is a **single line change in `core/di`**. Nothing else in the app changes.
@@ -146,11 +155,64 @@ Write the test first, watch it fail, then implement.
 
 - **Unit tests** for every cubit, repo, util, formatter, and model (`fromJson` / `toJson`).
   Cubit tests assert the emitted `StateResource` sequence (loading → success, loading → error).
-  Repo tests use a mocked Dio client and cover both success and failure.
+  Repo tests use a mocked Dio client and cover the scenario checklist below.
 - **End-to-end / integration tests** for every feature flow — the user-visible path from screen
   interaction to rendered result, driven with the mock repos.
 - Mirror the `lib/` structure under `test/` and `integration_test/`.
 - No feature is done without both its unit tests and its end-to-end test passing.
+
+### Test data comes from the mock repo
+
+A test file never hand-builds a payload. No `articleJson(...)` helper, no literal response map, no
+second copy of the fake data. Read the fixture the mock repo exposes (§6), and where a test needs a
+broken variant, derive it from that fixture by copying and mutating it. When the fixture changes,
+every test that depends on it changes with it — which is the point.
+
+### Repo tests — the scenario checklist
+
+Every repo method is tested against this list, with a mocked `AppDioClient`. A scenario that cannot
+occur for a given endpoint is skipped, and the subtask report says which and why.
+
+**Transport**
+
+1. No internet connection
+2. Connection timeout
+
+**Success**
+
+3. 200, good response body
+
+**Client error**
+
+4. 400, good response body
+5. 400, empty response body
+6. 400, null response body
+7. 400, garbage response body
+8. 400, empty error field
+9. 400, null error field
+10. 400, missing error field
+11. 400, error field of an unexpected type
+
+**Other status codes**
+
+12. 404
+13. 500
+
+**200 with a body that breaks the contract**
+
+14. 200, empty response body
+15. 200, null response body
+16. 200, garbage response body
+17. 200, empty data field
+18. 200, null data field
+19. 200, data field of an unexpected type
+20. 200, data with a null non-nullable field
+21. 200, data missing a non-nullable field
+22. 200, data with a field of an unexpected type
+
+Add a case for every other status code the endpoint documents (204, 401, 426, 429, …). Where the
+models make every field nullable, scenarios 20–22 apply to whatever *is* required — the envelope's
+data key, and each entry being an object of the expected type — and the report records that reading.
 
 ---
 
@@ -162,12 +224,15 @@ Before reporting a task complete:
 2. Every variable has an explicit type.
 3. No duplicated widget or logic; shared code moved to `core/`.
 4. Repo returns `StateResource`; errors routed through `network_error_handler`.
-5. Mock repo added or updated, and swappable from `core/di`.
-6. No stray strings, colors, endpoints, map keys, or route names outside their constants files.
-7. Cubit and repo are disposed with their screen.
-8. Builders/listeners wrap only the subtree that needs them.
-9. No abstraction beyond what these instructions describe.
-10. A subtask report was written to `configurations/reports/` (see §9).
+5. The mock repo was written before the real repo, is swappable from `core/di`, and owns the
+   feature's only fake payload.
+6. Repo tests cover the §7 scenario checklist and take their data from the mock repo's fixture —
+   no payload helpers or literal response maps in test files.
+7. No stray strings, colors, endpoints, map keys, or route names outside their constants files.
+8. Cubit and repo are disposed with their screen.
+9. Builders/listeners wrap only the subtree that needs them.
+10. No abstraction beyond what these instructions describe.
+11. A subtask report was written to `configurations/reports/` (see §9).
 
 ---
 

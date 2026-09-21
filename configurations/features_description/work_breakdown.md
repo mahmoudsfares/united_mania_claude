@@ -20,11 +20,16 @@ Work **one subtask at a time**, top to bottom. For each subtask:
 **Independence rule.** Every subtask below is self-contained: it compiles, runs, and passes its own
 tests using only what earlier subtasks produced. Nothing depends on work scheduled later. While
 implementing one, never create a file, parameter, or abstraction whose only purpose is to serve a
-later subtask — build it when its own subtask arrives.
+later subtask — build it when its own subtask arrives. There is exactly one exception, recorded at
+2.1.2: its test was rewritten against the 2.1.3 fixture after the mock-repo-first rule was added.
+
+**Mock repo before real repo.** CLAUDE.md §6 — a feature's mock repo is built first, because it
+owns the fake payload that the real repo's tests are written against. In a later feature, the mock
+repo subtask therefore comes before the repo subtask.
 
 **Where tests live.** Unit tests mirror `lib/` under `test/`. End-to-end tests live in
 `integration_test/` and always run against the mock repo, never the live API. Subtasks in Sprint 1
-have no UI, so they carry unit tests only; the end-to-end requirement starts at 2.3.2, the first
+have no UI, so they carry unit tests only; the end-to-end requirement starts at 2.5.1, the first
 subtask that puts a screen on the device.
 
 ---
@@ -51,7 +56,7 @@ shows nothing, and that is expected.
   also enabled — the two contradict each other.
 - Delete the `flutter create` sample: strip `lib/main.dart` to a bare `runApp` of an empty
   `MaterialApp`, and delete `test/widget_test.dart` (it tests the counter app that no longer
-  exists). Do not add a theme or routes here — those arrive in 1.2.1 and 2.3.2.
+  exists). Do not add a theme or routes here — those arrive in 1.2.1 and 2.5.1.
 - Create `test/` and `integration_test/` with one smoke test each that pumps the empty app.
 
 **Tests.** The two smoke tests.
@@ -170,7 +175,8 @@ swallowed.
 
 ## Sprint 2 — News feed
 
-Spec: [`news_feed.md`](news_feed.md). Ends with a working home screen listing real articles.
+Spec: [`news_feed.md`](news_feed.md). Ends with a working home screen listing real articles,
+paginated via infinite scroll.
 
 ### Task 2.1 — Data
 
@@ -198,26 +204,50 @@ query values from `ApiEndpoints`, maps the `articles` array to `Article` objects
 resource. Catches failures and returns `networkErrorHandler(...)`'s result — it never builds an
 error state by hand. Takes the dio client through its constructor so tests can inject a mock.
 
-**Tests.** Unit with a mocked client: 200 with two articles → success carrying two parsed articles;
-200 with an empty `articles` array → success carrying an empty list; 401, 429, and a timeout → the
-matching error message.
+**Tests.** Unit with a mocked client, covering the whole repo scenario checklist in CLAUDE.md §7 —
+the two transport failures, the 200 contract body, the eight 400 variants, the other documented
+status codes (404, 500, 401, 426, 429), and the malformed-200 variants. Every payload comes from
+`NewsFeedMockRepo`'s exposed fixture; the test file builds no data of its own. Because every
+`Article` field is `String?`, checklist items 20–22 are read against what the payload genuinely
+requires — the `articles` key being present, and each entry being an object.
 
 **Done when.** Tests pass.
+
+**Ordering note.** This subtask shipped before the mock-repo-first rule (CLAUDE.md §6) existed, so
+`NewsFeedRepo` was written ahead of `NewsFeedMockRepo`. Its test was rewritten afterwards to read
+from the fixture, and does not compile until 2.1.3 lands — the fail-first step, out of its usual
+place. Every repo after this one is built mock first.
 
 #### 2.1.3 — `NewsFeedMockRepo`
 
-**Goal.** Run and test the app without spending the 100-request daily quota.
+**Goal.** Run and test the app without spending the 100-request daily quota, and own the feature's
+only copy of the fake payload.
 
 **Do.** `business_logic/news_feed_mock_repo.dart`. Same public shape as the real repo, returning
-the same `StateResource`. Ten fake articles after a one-second delay, including the three awkward
-cases listed in [`news_feed.md` §5](news_feed.md): a null `urlToImage`, a `"[Removed]"` title, and
-a null `author` with a null `source.id`. A constructor flag makes it return an error resource
-instead.
+the same `StateResource`. A constructor flag makes it return an error resource instead.
+
+It exposes two fixtures, which are what `news_feed_repo_test.dart` already reads:
+
+- `static const Map<String, dynamic> successResponseBody` — `JsonKeys.status` plus
+  `JsonKeys.articles`, a list of ten article maps whose keys all come from `JsonKeys`. No
+  `totalResults`: `JsonKeys` has no constant for it and nothing in the app reads it.
+- `static const Map<String, dynamic> errorResponseBody` — `JsonKeys.status` plus
+  `JsonKeys.message`, the human text a 400 carries.
+
+`getNews()` waits one second, then parses `successResponseBody` through `Article.fromJson` rather
+than constructing `Article` objects by hand, so the runtime data and the test data are the same
+values. In failure mode it returns `StateResource.error` carrying
+`errorResponseBody[JsonKeys.message]`.
+
+The ten articles include the three awkward cases listed in
+[`news_feed.md` §5](news_feed.md): a null `urlToImage`, a `"[Removed]"` title, and a null `author`
+with a null `source.id`.
 
 **Tests.** Unit: the success path returns ten articles after the delay; the failure flag returns an
-error resource; the fake data contains the three awkward cases the UI tests rely on.
+error resource carrying the fixture's message; the fake data contains the three awkward cases the
+UI tests rely on; `successResponseBody` parses through `Article.fromJson` without throwing.
 
-**Done when.** Tests pass.
+**Done when.** Tests pass — including `news_feed_repo_test.dart`, which turns green here.
 
 ---
 
@@ -241,7 +271,10 @@ loading → error when it fails, using both a mocked repo and the real `NewsFeed
 
 ---
 
-### Task 2.3 — UI
+### Task 2.3 — Shared widgets
+
+Just one subtask. It used to be paired with the screen and the card under a single "Task 2.3 —
+UI", but those two need pagination (Task 2.4) to exist first and this one doesn't — see Task 2.5.
 
 #### 2.3.1 — Shared widgets
 
@@ -260,9 +293,100 @@ for a good one; the error view renders the given message and fires `onRetry` whe
 
 **Done when.** Tests pass.
 
-#### 2.3.2 — App shell and the first working screen
+---
 
-**Goal.** The app launches and lists articles. The first end-to-end test.
+### Task 2.4 — Pagination
+
+Added after 2.2.1 shipped, once real usage made clear the feed needed more than one page. Its three
+subtasks are built and reported before the rest of the feed's UI (Task 2.5) — 2.3.1 (shared
+widgets) does not need them, but 2.5.1 (the screen) is written against the paginated cubit from the
+start rather than being retrofitted. See the dependency map.
+
+#### 2.4.1 — Paginate `NewsFeedMockRepo`
+
+**Goal.** Serve fake data page by page, so 2.4.2's and 2.4.3's tests have something concrete to run
+against — the mock repo is extended first, same as CLAUDE.md §6 for a repo built from scratch.
+
+**Do.** `getNews()` becomes `getNews({int page = 1})` — defaulting to page 1, matching NewsAPI's
+own default for the parameter, so `NewsFeedCubit`'s existing zero-argument call (unchanged until
+2.4.3) keeps compiling and behaving exactly as before. Page 1 returns the existing ten
+articles (`successResponseBody`, unchanged). Page 2 returns four more articles, in a new
+`static const Map<String, dynamic> successResponseBodyPageTwo` fixture built the same way —
+`JsonKeys.status` plus a `JsonKeys.articles` list, keys from `JsonKeys`, values invented. Page 3
+and beyond return `StateResource.success` with an empty list; there is no fixture to build for
+this, since an empty `articles` array has no parsing edge case. `getNews()` still waits one second
+and still parses each fixture through `Article.fromJson` rather than building `Article` objects by
+hand. The `returnError` flag still returns `errorResponseBody`'s message regardless of which page
+was requested.
+
+**Tests.** Unit: `getNews(page: 1)` returns the original ten articles; `getNews(page: 2)` returns
+the four new ones; `getNews(page: 3)` returns an empty success list; the error flag still returns
+the fixture message for at least two different pages; `successResponseBodyPageTwo` parses through
+`Article.fromJson` without throwing.
+
+**Done when.** Tests pass.
+
+#### 2.4.2 — Paginate `NewsFeedRepo`
+
+**Goal.** Request a specific page from the real API.
+
+**Do.** `getNews()` becomes `getNews({int page = 1})`, the same default-parameter shape as 2.4.1,
+for the same reason — it keeps compiling against the cubit unchanged until 2.4.3. Add
+`ApiEndpoints.pageQueryParam`
+(`'page'`) and `ApiEndpoints.pageSizeQueryParam` (`'pageSize'`) — `static const String`, the same
+pattern as the existing query-param-name constants. The page size value itself is an `int`, so it
+does not belong in `ApiEndpoints` (CLAUDE.md §2: "static const String values only"); add
+`static const int pageSize = 10` on `NewsFeedRepo` and send it as the `pageSize` query value
+alongside the requested `page`. Parsing and error handling are unchanged from 2.1.2.
+
+**Tests.** Every existing scenario-checklist call site is updated to pass a page (`page: 1`) — the
+scenarios are page-independent, so behaviour does not change. Add a test that `getNews(page: 1)`
+sends `page=1` and `pageSize=10`, and that `getNews(page: 2)` sends `page=2` — proving the page
+number is forwarded rather than hardcoded. Data continues to come from `NewsFeedMockRepo`'s
+fixtures, now covering both of its pages.
+
+**Done when.** Tests pass.
+
+#### 2.4.3 — Paginate `NewsFeedCubit` and `NewsFeedState`
+
+**Goal.** Track the current page, load more on request, and know when to stop.
+
+**Do.**
+- `news_feed_state.dart` — `NewsFeedState` stops being a bare typedef and becomes a small
+  `Equatable` class wrapping `StateResource<List<Article>>` plus two flags: `isLoadingNextPage` and
+  `hasReachedMax`. It exposes the same `isInit` / `isLoading` / `isSuccess` / `isError` / `data` /
+  `error` getters as before, delegating to the wrapped resource, plus `copyWith`.
+- `news_feed_cubit.dart` — `getNews()` keeps its current meaning (page 1 / refresh): it resets the
+  tracked page to 1 and behaves exactly as before. A new `getNextPage()` requests
+  `currentPage + 1`, guarded so it does nothing if a load is already in flight, `hasReachedMax` is
+  already true, or the first page has not loaded successfully yet. On a successful, non-empty
+  response it appends the new articles to the existing list and advances the tracked page. On an
+  empty response it sets `hasReachedMax` instead of appending anything. On a failed response it
+  clears the loading flag and leaves the existing list untouched, so a further scroll simply
+  retries the same page.
+
+**Tests.** Unit with `bloc_test`, both with a mocked repo and the real (now two-page)
+`NewsFeedMockRepo`: `getNews()` still emits loading → success / loading → error unchanged;
+`getNextPage()` after a successful first page appends the second page's articles and leaves
+`hasReachedMax` false; `getNextPage()` once the repo returns an empty page sets `hasReachedMax`
+true without changing the article list; `getNextPage()` is a no-op (repo not called again) once
+`hasReachedMax` is true or while a load is already in flight; `getNextPage()` on a failed request
+turns the loading flag off and keeps the current articles.
+
+**Done when.** Tests pass.
+
+---
+
+### Task 2.5 — UI
+
+Originally laid out as `2.3.2`/`2.3.3`, right after the shared widgets. Moved here, after
+Pagination, because the screen (2.5.1) needs the paginated cubit (2.4.3) to exist first, and a
+subtask must not depend on one numbered after it — see the dependency map.
+
+#### 2.5.1 — App shell and the first working screen
+
+**Goal.** The app launches and lists articles. The first end-to-end test. Depends on 2.4.3, not
+directly on 2.2.1 — by the time this subtask starts, the cubit already paginates.
 
 **Do.**
 - `core/di/app_di.dart` — static singletons. A getter that builds the feed cubit with its repo, and
@@ -276,15 +400,19 @@ for a good one; the error view renders the given message and fires `onRetry` whe
   `getNews()`, `dispose` calls `AppDi.disposeNewsFeed()`, honouring the disposal rule in CLAUDE.md
   §2. The `BlocBuilder` wraps **only the `Scaffold` body**, never the `AppBar`. Render the four
   states from [`news_feed.md` §4](news_feed.md) — loader, error view, empty message, and a plain
-  `ListView` of titles. Card styling comes next, in 2.3.3.
+  `ListView` of titles. A `ScrollController` calls `getNextPage()` when the scroll position nears
+  the end of the list; when `isLoadingNextPage` is true the list's last row is a small loading
+  indicator. Card styling comes next, in 2.5.2.
 
-**Tests.** Widget: each of the four states renders the right thing.
-End-to-end with the mock repo: the app launches, shows the loader, then ten rows; in failure mode
-it shows the message and Retry reloads into the list.
+**Tests.** Widget: each of the four states renders the right thing; the loading-more row appears at
+the end of the list when `isLoadingNextPage` is true and is absent otherwise.
+End-to-end with the mock repo: the app launches, shows the loader, then ten rows; scrolling to the
+bottom loads four more (fourteen total) and scrolling further adds no more once the mock's pages
+are exhausted; in failure mode it shows the message and Retry reloads into the list.
 
 **Done when.** Tests pass and the app runs on a device against the mock repo.
 
-#### 2.3.3 — The article card
+#### 2.5.2 — The article card
 
 **Goal.** Make the list look like a news feed.
 
@@ -349,7 +477,7 @@ content renders neither, and does not overflow; the truncation counter is stripp
 - `news_details_cubit.dart` and `news_details_state.dart` —
   `typedef NewsDetailsState = StateResource<void>;`, with `openArticle(String? url)` following the
   table in [`news_details.md` §4](news_details.md). The screen becomes stateful so it can dispose
-  the cubit through `AppDi`, matching 2.3.2.
+  the cubit through `AppDi`, matching 2.5.1.
 - The hyperlink itself, with a `BlocListener` around **only the link** that shows the failure
   snackbar.
 
@@ -400,12 +528,15 @@ Each subtask may use everything above it and nothing below it.
  │           └─ 1.3.2  NetworkErrorHandler
  │               └─ 1.3.3  ApiEndpoints + interceptor + dio client
  │                   └─ 2.1.1  models
- │                       └─ 2.1.2  repo
+ │                       └─ 2.1.2  repo            ← its test reads 2.1.3's fixture
  │                           └─ 2.1.3  mock repo
  │                               └─ 2.2.1  cubit + state
- └─ 2.3.1  shared widgets
-     └─ 2.3.2  di + routing + main + feed screen      ← first end-to-end test
-         └─ 2.3.3  article card
+ │                                   └─ 2.4.1  mock repo pagination
+ │                                       └─ 2.4.2  repo pagination
+ │                                           └─ 2.4.3  cubit + state pagination (*)
+ └─ 2.3.1  shared widgets (*)
+     └─ 2.5.1  di + routing + main + feed screen      ← first end-to-end test; (*) needs both
+         └─ 2.5.2  article card
              └─ 3.1.1  details route + navigation
                  └─ 3.1.2  details content
                      └─ 3.1.3  url launcher + hyperlink
@@ -420,7 +551,7 @@ Each subtask may use everything above it and nothing below it.
 Two choices were made to keep the build moving. Either can be reversed; both are worth a look
 before Sprint 2 starts.
 
-1. **Feature-local widgets live inside the screen file** as private classes (2.3.3). The project
+1. **Feature-local widgets live inside the screen file** as private classes (2.5.2). The project
    structure defines a feature as screen + `models/` + `business_logic/`, with no `widgets/`
    directory, and `core/shared_widgets` is reserved for widgets used in more than one place. If a
    feature's screen file grows uncomfortable, adding `features/<feature>/widgets/` to the structure

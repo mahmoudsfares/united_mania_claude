@@ -7,6 +7,10 @@ void main() {
     WidgetTester tester,
   ) async {
     await tester.pumpWidget(const UnitedManiaApp());
+    // A deterministic jump past the mock repo's one-second delay, rather
+    // than pumpAndSettle: the indeterminate loader's animation keeps
+    // scheduling frames, which makes "settled" unreliable to wait for here.
+    await tester.pump(const Duration(seconds: 1));
 
     expect(find.byType(MaterialApp), findsOneWidget);
     expect(tester.takeException(), isNull);
