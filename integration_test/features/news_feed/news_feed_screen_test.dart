@@ -57,17 +57,17 @@ void main() {
 
     await tester.pumpAndSettle();
 
-    await _expectCardCount(tester, 10);
+    await _expectCardCount(tester, 9);
 
     await tester.drag(find.byType(ListView), _dragToEndOffset);
     await tester.pumpAndSettle();
 
-    await _expectCardCount(tester, 14);
+    await _expectCardCount(tester, 13);
 
     await tester.drag(find.byType(ListView), _dragToEndOffset);
     await tester.pumpAndSettle();
 
-    await _expectCardCount(tester, 14);
+    await _expectCardCount(tester, 13);
   });
 
   testWidgets('shows an error message and recovers on retry', (
@@ -102,6 +102,28 @@ void main() {
     await tester.tap(find.text(AppStrings.retry));
     await tester.pumpAndSettle();
 
-    await _expectCardCount(tester, 10);
+    await _expectCardCount(tester, 9);
+  });
+
+  testWidgets('pull to refresh shows the loader, then the refreshed list', (
+    WidgetTester tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.binding.setSurfaceSize(_scrollableSurface);
+
+    app.main();
+    await tester.pumpAndSettle();
+
+    await _expectCardCount(tester, 9);
+
+    await tester.fling(find.byType(ListView), const Offset(0, 300), 1000);
+    await tester.pump();
+    await tester.pump(const Duration(seconds: 1));
+
+    expect(find.byType(AppLoader), findsOneWidget);
+
+    await tester.pumpAndSettle();
+
+    await _expectCardCount(tester, 9);
   });
 }

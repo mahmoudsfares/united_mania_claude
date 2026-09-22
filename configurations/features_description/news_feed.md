@@ -127,6 +127,10 @@ Verified against the live endpoint on 2026-09-16 — key valid, 4,613 results.
 `NewsFeedCubit.getNews()` is called once when the screen is first built, and emits a
 `StateResource<List<Article>>`.
 
+Before either repo returns its list, articles whose `title` is the literal string `"[Removed]"` —
+NewsAPI's placeholder for takedown content — are dropped, in one place shared by both repos, so the
+cubit and the screen never see them.
+
 | state | what the screen shows |
 |---|---|
 | `isInit` | nothing — the first frame before loading starts |
@@ -218,10 +222,13 @@ allowed here and nowhere else.
   comes from `NewsFeedMockRepo`'s fixtures — the test file builds no payload of its own. Separately,
   that the requested `page` and the fixed `pageSize` are sent as query values, for more than one
   page number.
-- `NewsFeedMockRepo`: page 1 returns the original ten articles (with the three awkward cases),
+- `NewsFeedMockRepo`: page 1 parses all ten fixture articles (with the three awkward cases) through
+  `Article.fromJson` and returns the nine that remain once the `"[Removed]"` one is filtered out,
   page 2 returns the four new ones, page 3 returns an empty list, the failure flag returns the
   fixture message regardless of page, and both success fixtures parse cleanly through
   `Article.fromJson`
+- a shared filter dropping `"[Removed]"`-titled articles: three articles with one removed yields
+  two, and a list of only removed articles yields an empty one
 - `NewsFeedCubit`: `getNews()` emits loading → success, and loading → error; `getNextPage()` appends
   a successful next page and leaves `hasReachedMax` false, sets `hasReachedMax` on an empty page
   without touching the article list, is a no-op once `hasReachedMax` is true or while already
@@ -229,8 +236,8 @@ allowed here and nowhere else.
 
 **End-to-end**, driven by `NewsFeedMockRepo`
 
-- app launches on the feed, loader appears, then 10 cards
-- scrolling to the bottom loads 4 more cards (14 total); scrolling further triggers no further
+- app launches on the feed, loader appears, then 9 cards (the removed one dropped)
+- scrolling to the bottom loads 4 more cards (13 total); scrolling further triggers no further
   loader once the mock's pages are exhausted
 - tapping the first card opens the details screen
 - error mode shows the message, and Retry reloads into the list

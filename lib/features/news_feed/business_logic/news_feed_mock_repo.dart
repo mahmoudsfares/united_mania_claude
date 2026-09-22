@@ -1,6 +1,7 @@
 import '../../../core/networking/state_resource.dart';
 import '../../../core/utils/json_keys.dart';
 import '../models/article.dart';
+import 'removed_articles_filter.dart';
 
 class NewsFeedMockRepo {
   const NewsFeedMockRepo({this.returnError = false});
@@ -291,6 +292,8 @@ class NewsFeedMockRepo {
               Article.fromJson(articleJson as Map<String, dynamic>),
         )
         .toList();
-    return StateResource<List<Article>>.success(articles);
+    return StateResource<List<Article>>.success(
+      RemovedArticlesFilter.dropRemoved(articles),
+    );
   }
 }

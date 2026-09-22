@@ -6,6 +6,7 @@ import '../../../core/networking/network_error_handler.dart';
 import '../../../core/networking/state_resource.dart';
 import '../../../core/utils/json_keys.dart';
 import '../models/article.dart';
+import 'removed_articles_filter.dart';
 
 class NewsFeedRepo {
   NewsFeedRepo(this._dioClient);
@@ -34,7 +35,9 @@ class NewsFeedRepo {
                 Article.fromJson(articleJson as Map<String, dynamic>),
           )
           .toList();
-      return StateResource<List<Article>>.success(articles);
+      return StateResource<List<Article>>.success(
+        RemovedArticlesFilter.dropRemoved(articles),
+      );
     } catch (error) {
       return networkErrorHandler<List<Article>>(error);
     }

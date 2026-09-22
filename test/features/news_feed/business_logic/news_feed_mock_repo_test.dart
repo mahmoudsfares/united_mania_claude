@@ -2,12 +2,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:united_mania_claude/core/networking/state_resource.dart';
 import 'package:united_mania_claude/core/utils/json_keys.dart';
 import 'package:united_mania_claude/features/news_feed/business_logic/news_feed_mock_repo.dart';
+import 'package:united_mania_claude/features/news_feed/business_logic/removed_articles_filter.dart';
 import 'package:united_mania_claude/features/news_feed/models/article.dart';
 
 void main() {
   group('NewsFeedMockRepo.getNews', () {
     test(
-      'page 1 returns the original ten articles after a one-second delay',
+      'page 1 returns nine articles after dropping the removed one, after a '
+      'one-second delay',
       () async {
         const NewsFeedMockRepo repo = NewsFeedMockRepo();
         final Stopwatch stopwatch = Stopwatch()..start();
@@ -23,7 +25,14 @@ void main() {
         );
         expect(result.isSuccess, true);
         expect(result.error, isNull);
-        expect(result.data?.length, 10);
+        expect(result.data?.length, 9);
+        expect(
+          result.data?.any(
+            (Article article) =>
+                article.title == RemovedArticlesFilter.removedPlaceholder,
+          ),
+          false,
+        );
       },
     );
 

@@ -100,20 +100,47 @@ class _NewsFeedScreenState extends State<NewsFeedScreen> {
           }
           final List<Article> articles = state.data ?? <Article>[];
           if (articles.isEmpty) {
-            return const Center(child: Text(AppStrings.noArticles));
+            return _buildEmptyState();
           }
-          return ListView.builder(
-            controller: _scrollController,
-            itemCount: articles.length + (state.isLoadingNextPage ? 1 : 0),
-            itemBuilder: (BuildContext context, int index) {
-              if (index >= articles.length) {
-                return const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 16.0),
-                  child: AppLoader(),
-                );
-              }
-              return _ArticleCard(article: articles[index]);
-            },
+          return RefreshIndicator(
+            onRefresh: widget.cubit.getNews,
+            child: ListView.builder(
+              controller: _scrollController,
+              physics: const AlwaysScrollableScrollPhysics(),
+              itemCount: articles.length + (state.isLoadingNextPage ? 1 : 0),
+              itemBuilder: (BuildContext context, int index) {
+                if (index >= articles.length) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 16.0),
+                    child: AppLoader(),
+                  );
+                }
+                return _ArticleCard(article: articles[index]);
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  // RefreshIndicator needs a scrollable descendant to detect the pull
+  // gesture, which a bare Center does not provide; ConstrainedBox forces the
+  // ListView's single child to the viewport height so the message still
+  // reads as centred rather than pinned to the top.
+  Widget _buildEmptyState() {
+    return RefreshIndicator(
+      onRefresh: widget.cubit.getNews,
+      child: LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints constraints) {
+          return ListView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            children: <Widget>[
+              ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: const Center(child: Text(AppStrings.noArticles)),
+              ),
+            ],
           );
         },
       ),

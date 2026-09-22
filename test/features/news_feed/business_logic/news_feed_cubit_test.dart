@@ -174,7 +174,7 @@ void main() {
         const NewsFeedState(resource: StateResource<List<Article>>.loading()),
         isA<NewsFeedState>()
             .having((NewsFeedState state) => state.isSuccess, 'isSuccess', true)
-            .having((NewsFeedState state) => state.data?.length, 'data.length', 10)
+            .having((NewsFeedState state) => state.data?.length, 'data.length', 9)
             .having(
               (NewsFeedState state) => state.hasReachedMax,
               'hasReachedMax',
@@ -208,14 +208,14 @@ void main() {
       expect: () => <Object>[
         const NewsFeedState(resource: StateResource<List<Article>>.loading()),
         isA<NewsFeedState>()
-            .having((NewsFeedState state) => state.data?.length, 'data.length', 10),
+            .having((NewsFeedState state) => state.data?.length, 'data.length', 9),
         isA<NewsFeedState>()
             .having(
               (NewsFeedState state) => state.isLoadingNextPage,
               'isLoadingNextPage',
               true,
             )
-            .having((NewsFeedState state) => state.data?.length, 'data.length', 10),
+            .having((NewsFeedState state) => state.data?.length, 'data.length', 9),
         isA<NewsFeedState>()
             .having(
               (NewsFeedState state) => state.isLoadingNextPage,
@@ -227,7 +227,7 @@ void main() {
               'hasReachedMax',
               false,
             )
-            .having((NewsFeedState state) => state.data?.length, 'data.length', 14),
+            .having((NewsFeedState state) => state.data?.length, 'data.length', 13),
       ],
     );
 
@@ -252,7 +252,7 @@ void main() {
               'hasReachedMax',
               true,
             )
-            .having((NewsFeedState state) => state.data?.length, 'data.length', 14),
+            .having((NewsFeedState state) => state.data?.length, 'data.length', 13),
       ],
     );
   });

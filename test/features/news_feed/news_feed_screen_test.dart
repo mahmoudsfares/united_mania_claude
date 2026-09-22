@@ -96,6 +96,64 @@ void main() {
       await cubit.close();
     });
 
+    testWidgets('pull to refresh over the empty state calls getNews() again', (
+      WidgetTester tester,
+    ) async {
+      int pageOneRequests = 0;
+      final NewsFeedCubit cubit = NewsFeedCubit(({int page = 1}) async {
+        pageOneRequests++;
+        return const StateResource<List<Article>>.success(<Article>[]);
+      });
+
+      await tester.pumpWidget(MaterialApp(home: NewsFeedScreen(cubit: cubit)));
+      await tester.pumpAndSettle();
+
+      expect(find.text(AppStrings.noArticles), findsOneWidget);
+      expect(pageOneRequests, 1);
+
+      await tester.fling(find.byType(ListView), const Offset(0, 300), 1000);
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pumpAndSettle();
+
+      expect(pageOneRequests, 2);
+
+      await cubit.close();
+    });
+
+    testWidgets(
+      'pull to refresh over the article list calls getNews() again',
+      (WidgetTester tester) async {
+        int pageOneRequests = 0;
+        final List<Article> manyArticles = List<Article>.generate(
+          20,
+          (_) => _article,
+        );
+        final NewsFeedCubit cubit = NewsFeedCubit(({int page = 1}) async {
+          if (page == 1) {
+            pageOneRequests++;
+          }
+          return StateResource<List<Article>>.success(manyArticles);
+        });
+
+        await tester.pumpWidget(
+          MaterialApp(home: NewsFeedScreen(cubit: cubit)),
+        );
+        await tester.pumpAndSettle();
+
+        expect(pageOneRequests, 1);
+
+        await tester.fling(find.byType(ListView), const Offset(0, 300), 1000);
+        await tester.pump();
+        await tester.pump(const Duration(seconds: 1));
+        await tester.pumpAndSettle();
+
+        expect(pageOneRequests, 2);
+
+        await cubit.close();
+      },
+    );
+
     testWidgets('shows the error view with retry on failure', (
       WidgetTester tester,
     ) async {

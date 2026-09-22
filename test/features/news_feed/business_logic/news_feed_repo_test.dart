@@ -8,6 +8,7 @@ import 'package:united_mania_claude/core/utils/app_error_messages.dart';
 import 'package:united_mania_claude/core/utils/json_keys.dart';
 import 'package:united_mania_claude/features/news_feed/business_logic/news_feed_mock_repo.dart';
 import 'package:united_mania_claude/features/news_feed/business_logic/news_feed_repo.dart';
+import 'package:united_mania_claude/features/news_feed/business_logic/removed_articles_filter.dart';
 import 'package:united_mania_claude/features/news_feed/models/article.dart';
 
 class MockAppDioClient extends Mock implements AppDioClient {}
@@ -127,32 +128,46 @@ void main() {
   });
 
   group('NewsFeedRepo.getNews — 200 with the contract body', () {
-    test('3 — parses every article in the mock repo payload', () async {
-      stubSuccess(NewsFeedMockRepo.successResponseBody);
+    test(
+      '3 — parses every article in the mock repo payload, dropping the '
+      'removed one',
+      () async {
+        stubSuccess(NewsFeedMockRepo.successResponseBody);
 
-      final StateResource<List<Article>> result = await repo.getNews(page: 1);
+        final StateResource<List<Article>> result = await repo.getNews(
+          page: 1,
+        );
 
-      expect(result.isSuccess, true);
-      expect(result.error, isNull);
-      expect(result.data?.length, fixtureArticles.length);
-      for (int index = 0; index < fixtureArticles.length; index++) {
-        final Map<String, dynamic> expected =
-            fixtureArticles[index] as Map<String, dynamic>;
-        final Article actual = result.data![index];
-        final Map<String, dynamic>? expectedSource =
-            expected[JsonKeys.source] as Map<String, dynamic>?;
+        final List<Map<String, dynamic>> expectedArticles = fixtureArticles
+            .cast<Map<String, dynamic>>()
+            .where(
+              (Map<String, dynamic> article) =>
+                  article[JsonKeys.title] !=
+                  RemovedArticlesFilter.removedPlaceholder,
+            )
+            .toList();
 
-        expect(actual.title, expected[JsonKeys.title]);
-        expect(actual.author, expected[JsonKeys.author]);
-        expect(actual.description, expected[JsonKeys.description]);
-        expect(actual.url, expected[JsonKeys.url]);
-        expect(actual.urlToImage, expected[JsonKeys.urlToImage]);
-        expect(actual.publishedAt, expected[JsonKeys.publishedAt]);
-        expect(actual.content, expected[JsonKeys.content]);
-        expect(actual.source?.id, expectedSource?[JsonKeys.id]);
-        expect(actual.source?.name, expectedSource?[JsonKeys.name]);
-      }
-    });
+        expect(result.isSuccess, true);
+        expect(result.error, isNull);
+        expect(result.data?.length, expectedArticles.length);
+        for (int index = 0; index < expectedArticles.length; index++) {
+          final Map<String, dynamic> expected = expectedArticles[index];
+          final Article actual = result.data![index];
+          final Map<String, dynamic>? expectedSource =
+              expected[JsonKeys.source] as Map<String, dynamic>?;
+
+          expect(actual.title, expected[JsonKeys.title]);
+          expect(actual.author, expected[JsonKeys.author]);
+          expect(actual.description, expected[JsonKeys.description]);
+          expect(actual.url, expected[JsonKeys.url]);
+          expect(actual.urlToImage, expected[JsonKeys.urlToImage]);
+          expect(actual.publishedAt, expected[JsonKeys.publishedAt]);
+          expect(actual.content, expected[JsonKeys.content]);
+          expect(actual.source?.id, expectedSource?[JsonKeys.id]);
+          expect(actual.source?.name, expectedSource?[JsonKeys.name]);
+        }
+      },
+    );
 
     test('sends the feed query values from ApiEndpoints', () async {
       stubSuccess(NewsFeedMockRepo.successResponseBody);
